@@ -121,7 +121,7 @@ class ImportOTWizard(models.TransientModel):
                     struct_id = contract.structure_type_id.default_struct_id.id
                 else:
                     # fallback: pick any salary structure in company
-                    struct = self.env['hr.payroll.structure'].search([('company_id', '=', contract.company_id.id)], limit=1)
+                    struct = self.env['hr.payroll.structure'].search([], limit=1)
                     struct_id = struct.id if struct else False
 
                 if not struct_id:
