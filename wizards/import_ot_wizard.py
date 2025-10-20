@@ -116,7 +116,17 @@ class ImportOTWizard(models.TransientModel):
                     continue
 
                 # Odoo 17: get salary structure from contract.structure_type_id.default_struct_id
-                struct_id = contract.structure_type_id.default_struct_id.id if contract.structure_type_id and contract.structure_type_id.default_struct_id else False
+                struct_id = False
+                if contract.structure_type_id and contract.structure_type_id.default_struct_id:
+                    struct_id = contract.structure_type_id.default_struct_id.id
+                else:
+                    # fallback: pick any salary structure in company
+                    struct = self.env['hr.payroll.structure'].search([('company_id', '=', contract.company_id.id)], limit=1)
+                    struct_id = struct.id if struct else False
+
+                if not struct_id:
+                    raise UserError(_('No salary structure found for employee %s (%s). Please assign a salary structure first.') %
+                                    (contract.employee_id.name, contract.employee_id.barcode))
 
                 payslip = Payroll.create({
                     'employee_id': contract.employee_id.id,
