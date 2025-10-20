@@ -22,15 +22,20 @@ class ImportOTWizard(models.TransientModel):
     sheet_ref = fields.Many2one('hr.ot.sheet', string='OT Sheet')
 
     # ------------------------------------------------------------------
-    # helper: generate the same name Odoo would give the payslip
+    # helper: build the same name Odoo would put on a draft payslip
     # ------------------------------------------------------------------
     @api.model
     def _generate_payslip_name(self, employee, struct_id, date_from, date_to):
         struct = self.env['hr.payroll.structure'].browse(struct_id)
         if struct and struct.payslip_name:
             return struct.payslip_name
-        # fallback: reproduce standard Odoo pattern
-        return self.env['hr.payslip']._compute_payslip_name(employee, date_from, date_to)
+
+        # fallback: reproduce Odoo standard pattern
+        return _('Payslip %s (%s - %s)') % (
+            employee.name or '',
+            date_from.strftime('%B %Y'),
+            date_to.strftime('%B %Y'),
+        )
 
     # ------------------------------------------------------------------
     # openpyxl sanity check
