@@ -21,10 +21,27 @@ class ImportOTWizard(models.TransientModel):
     year = fields.Integer('Year', required=True)
     sheet_ref = fields.Many2one('hr.ot.sheet', string='OT Sheet')
 
+    # ------------------------------------------------------------------
+    # helper: generate the same name Odoo would give the payslip
+    # ------------------------------------------------------------------
+    @api.model
+    def _generate_payslip_name(self, employee, struct_id, date_from, date_to):
+        struct = self.env['hr.payroll.structure'].browse(struct_id)
+        if struct and struct.payslip_name:
+            return struct.payslip_name
+        # fallback: reproduce standard Odoo pattern
+        return self.env['hr.payslip']._compute_payslip_name(employee, date_from, date_to)
+
+    # ------------------------------------------------------------------
+    # openpyxl sanity check
+    # ------------------------------------------------------------------
     def _check_openpyxl(self):
         if not load_workbook:
             raise UserError(_('openpyxl is not installed on the server. Please install it (pip install openpyxl)'))
 
+    # ------------------------------------------------------------------
+    # import OT lines from Excel
+    # ------------------------------------------------------------------
     def action_import(self):
         self._check_openpyxl()
         if not self.file:
@@ -35,7 +52,6 @@ class ImportOTWizard(models.TransientModel):
         wb = load_workbook(fp, data_only=True)
         ws = wb.active
 
-        # Expected columns: Employee Code | Employee Name | Normal OT | Holiday OT | Late Deduction
         rows = list(ws.iter_rows(min_row=2, values_only=True))
         sheet = self.sheet_ref or self.env['hr.ot.sheet'].create({
             'name': f'OT/{self.year}/{self.month}',
@@ -46,7 +62,7 @@ class ImportOTWizard(models.TransientModel):
         error_lines = []
         created = 0
         for idx, row in enumerate(rows, start=2):
-            row = list(row) + [None]*5
+            row = list(row) + [None] * 5
             emp_code, emp_name, ot_normal, ot_holiday, late_deduction = row[:5]
 
             try:
@@ -86,6 +102,9 @@ class ImportOTWizard(models.TransientModel):
             'res_id': sheet.id,
         }
 
+    # ------------------------------------------------------------------
+    # create / update payslip inputs from OT sheet
+    # ------------------------------------------------------------------
     def action_create_inputs(self):
         if not self.sheet_ref:
             raise UserError(_('Select an OT sheet to apply.'))
@@ -120,7 +139,6 @@ class ImportOTWizard(models.TransientModel):
                 if contract.structure_type_id and contract.structure_type_id.default_struct_id:
                     struct_id = contract.structure_type_id.default_struct_id.id
                 else:
-                    # fallback: pick any salary structure in company
                     struct = self.env['hr.payroll.structure'].search([], limit=1)
                     struct_id = struct.id if struct else False
 
@@ -128,6 +146,9 @@ class ImportOTWizard(models.TransientModel):
                     raise UserError(_('No salary structure found for employee %s (%s). Please assign a salary structure first.') %
                                     (contract.employee_id.name, contract.employee_id.barcode))
 
+                # ----------------------------------------------------------
+                #  NEW: supply the mandatory name while creating the payslip
+                # ----------------------------------------------------------
                 payslip = Payroll.create({
                     'employee_id': contract.employee_id.id,
                     'contract_id': contract.id,
@@ -135,6 +156,7 @@ class ImportOTWizard(models.TransientModel):
                     'date_from': date_from,
                     'date_to': date_to,
                     'state': 'draft',
+                    'name': self._generate_payslip_name(contract.employee_id, struct_id, date_from, date_to),
                 })
 
             def upsert_input(payslip, code, amount):
