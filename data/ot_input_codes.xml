@@ -1,0 +1,14 @@
+<odoo>
+  <record id="input_type_ot_normal" model="hr.payslip.input.type">
+    <field name="name">OT Normal</field>
+    <field name="code">OT_NORMAL</field>
+  </record>
+  <record id="input_type_ot_holiday" model="hr.payslip.input.type">
+    <field name="name">OT Holiday</field>
+    <field name="code">OT_HOLIDAY</field>
+  </record>
+  <record id="input_type_late_deduction" model="hr.payslip.input.type">
+    <field name="name">Late Deduction</field>
+    <field name="code">LATE_DEDUCTION</field>
+  </record>
+</odoo>
