@@ -9,7 +9,7 @@
                   string="Apply to Payslips"
                   type="object"
                   class="btn-primary"
-                  states="draft"/>
+                  invisible="state != 'draft'"/>
           <field name="state" widget="statusbar"/>
         </header>
         <sheet>
