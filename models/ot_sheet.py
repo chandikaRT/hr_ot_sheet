@@ -97,7 +97,7 @@ class HrOtSheet(models.Model):
         message = f'Imported {created} rows.'
         if error_lines:
             message += ' Errors: ' + ', '.join([f'Row {r}: {m}' for r, m in error_lines])
-        return {
+        notification = {
             'type': 'ir.actions.client',
             'tag': 'display_notification',
             'params': {
@@ -105,8 +105,16 @@ class HrOtSheet(models.Model):
                 'message': message,
                 'type': 'info',
                 'sticky': False,
-                'next': {'type': 'ir.actions.act_view_reload'},   # <─ forces form reload
             }
+        }
+        # force-reload the current form
+        return {
+            'type': 'ir.actions.act_window',
+            'res_model': self._name,
+            'res_id': self.id,
+            'view_mode': 'form',
+            'target': 'main',
+            'flags': {'reload': True},
         }
 
     # ------------------------------------------------------------------
