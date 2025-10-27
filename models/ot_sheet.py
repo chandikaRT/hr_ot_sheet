@@ -100,7 +100,13 @@ class HrOtSheet(models.Model):
         return {
             'type': 'ir.actions.client',
             'tag': 'display_notification',
-            'params': {'title': _('Import result'), 'message': message, 'type': 'info', 'sticky': False},
+            'params': {
+                'title': _('Import result'),
+                'message': message,
+                'type': 'info',
+                'sticky': False,
+                'next': {'type': 'ir.actions.act_view_reload'},   # <─ forces form reload
+            }
         }
 
     # ------------------------------------------------------------------
