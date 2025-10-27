@@ -161,13 +161,13 @@ class HrOtSheet(models.Model):
                     ('input_type_id', '=', input_types[code].id)
                 ], limit=1)
                 if existing:
-                    existing.write({'amount': amount, 'description': desc or ''})
+                    existing.write({'amount': amount, 'name': desc or ''})
                 else:
                     Input.create({
                         'payslip_id': slip.id,
                         'input_type_id': input_types[code].id,
                         'amount': amount,
-                        'description': desc or '',
+                        'name': desc or '',
                     })
 
             upsert('OT_NORMAL', line.ot_normal, line.description)
