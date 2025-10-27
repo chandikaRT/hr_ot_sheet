@@ -1,10 +1,17 @@
+<?xml version="1.0" encoding="utf-8"?>
 <odoo>
+  <!-- form -->
   <record id="view_hr_ot_sheet_form" model="ir.ui.view">
     <field name="name">hr.ot.sheet.form</field>
     <field name="model">hr.ot.sheet</field>
     <field name="arch" type="xml">
       <form string="OT Sheet">
         <header>
+          <button name="action_import_excel"
+                  string="Import Excel"
+                  type="object"
+                  class="btn-secondary"
+                  invisible="state != 'draft'"/>
           <button name="action_apply_to_payslips"
                   string="Apply to Payslips"
                   type="object"
@@ -35,12 +42,19 @@
                 </tree>
               </field>
             </page>
+            <page string="Import" invisible="state != 'draft'">
+              <group>
+                <field name="import_file" filename="import_filename"/>
+                <field name="import_filename" invisible="1"/>
+              </group>
+            </page>
           </notebook>
         </sheet>
       </form>
     </field>
   </record>
 
+  <!-- tree -->
   <record id="view_hr_ot_sheet_tree" model="ir.ui.view">
     <field name="name">hr.ot.sheet.tree</field>
     <field name="model">hr.ot.sheet</field>
@@ -54,6 +68,7 @@
     </field>
   </record>
 
+  <!-- action / menu -->
   <record id="action_hr_ot_sheet" model="ir.actions.act_window">
     <field name="name">OT Sheets</field>
     <field name="res_model">hr.ot.sheet</field>
@@ -62,5 +77,4 @@
 
   <menuitem id="menu_hr_ot_root" name="OT Sheet" parent="hr.menu_hr_root"/>
   <menuitem id="menu_hr_ot_sheet" name="OT Sheets" parent="menu_hr_ot_root" action="action_hr_ot_sheet"/>
-
 </odoo>

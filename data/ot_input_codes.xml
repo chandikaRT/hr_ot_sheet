@@ -1,4 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
 <odoo>
+  <!-- salary input types -->
   <record id="input_type_ot_normal" model="hr.payslip.input.type">
     <field name="name">OT Normal</field>
     <field name="code">OT_NORMAL</field>
@@ -11,6 +13,8 @@
     <field name="name">Late Deduction</field>
     <field name="code">LATE_DEDUCTION</field>
   </record>
+
+  <!-- sequence for OT sheet name -->
   <record id="seq_hr_ot_sheet" model="ir.sequence">
     <field name="name">OT Sheet Sequence</field>
     <field name="code">hr.ot.sheet</field>

@@ -1,39 +1,117 @@
-from odoo import api, models, fields
+# -*- coding: utf-8 -*-
+import base64
+import io
 import calendar
+from datetime import date
+from odoo import api, fields, models, _
+from odoo.exceptions import UserError
 
-class HROTSheet(models.Model):
+try:
+    from openpyxl import load_workbook
+except ImportError:
+    load_workbook = None
+
+
+class HrOtSheet(models.Model):
     _name = 'hr.ot.sheet'
     _description = 'OT Sheet Header'
 
+    # ------------------------------------------------------------------
+    # core fields
+    # ------------------------------------------------------------------
     name = fields.Char(string='Reference', copy=False, index=True)
     month = fields.Selection([
         ('1', 'January'), ('2', 'February'), ('3', 'March'),
-        ('4', 'April'),   ('5', 'May'),      ('6', 'June'),
-        ('7', 'July'),    ('8', 'August'),   ('9', 'September'),
-        ('10', 'October'),('11', 'November'),('12', 'December')
+        ('4', 'April'), ('5', 'May'), ('6', 'June'),
+        ('7', 'July'), ('8', 'August'), ('9', 'September'),
+        ('10', 'October'), ('11', 'November'), ('12', 'December')
     ], required=True)
-    year  = fields.Integer(required=True, default=fields.Date.today().year)
-    line_ids = fields.One2many('hr.ot.sheet.line','sheet_id', string='OT Lines')
-    state = fields.Selection([('draft','Draft'),('done','Done')], default='draft')
-    
+    year = fields.Integer(required=True, default=lambda _: date.today().year)
+    line_ids = fields.One2many('hr.ot.sheet.line', 'sheet_id', string='OT Lines')
+    state = fields.Selection([('draft', 'Draft'), ('done', 'Done')], default='draft')
+
+    # ------------------------------------------------------------------
+    # import helper fields (never stored)
+    # ------------------------------------------------------------------
+    import_file = fields.Binary(string='OT Excel file')
+    import_filename = fields.Char()
+
+    # ------------------------------------------------------------------
+    # automatic name 001/10/2025
+    # ------------------------------------------------------------------
     @api.model_create_multi
     def create(self, vals_list):
         for vals in vals_list:
             if vals.get('name', 'New') == 'New':
                 month = int(vals.get('month'))
-                year  = int(vals.get('year'))
+                year = int(vals.get('year'))
                 seq = self.env['ir.sequence'].next_by_code('hr.ot.sheet') or '001'
                 vals['name'] = f"{seq}/{month:02d}/{year}"
         return super().create(vals_list)
-    
+
+    # ------------------------------------------------------------------
+    # import Excel button
+    # ------------------------------------------------------------------
+    def action_import_excel(self):
+        self.ensure_one()
+        if not self.import_file:
+            raise UserError(_('Please choose an Excel file first.'))
+        if not load_workbook:
+            raise UserError(_('python library "openpyxl" is missing on the server.'))
+
+        data = base64.b64decode(self.import_file)
+        ws = load_workbook(io.BytesIO(data), data_only=True).active
+
+        error_lines, created = [], 0
+        for idx, row in enumerate(ws.iter_rows(min_row=2, values_only=True), 2):
+            row = list(row) + [None] * 5
+            emp_code, emp_name, ot_normal, ot_holiday, late_ded = row[:5]
+
+            try:
+                ot_normal = float(ot_normal or 0)
+                ot_holiday = float(ot_holiday or 0)
+                late_ded = float(late_ded or 0)
+            except Exception:
+                error_lines.append((idx, 'Invalid numeric value'))
+                continue
+
+            employee = None
+            if emp_code:
+                employee = self.env['hr.employee'].search([('barcode', '=', str(emp_code))], limit=1)
+            if not employee and emp_name:
+                employee = self.env['hr.employee'].search([('name', 'ilike', str(emp_name))], limit=1)
+            if not employee:
+                error_lines.append((idx, f'Employee not found: {emp_code}/{emp_name}'))
+                continue
+
+            self.env['hr.ot.sheet.line'].create({
+                'sheet_id': self.id,
+                'employee_id': employee.id,
+                'ot_normal': ot_normal,
+                'ot_holiday': ot_holiday,
+                'late_deduction': late_ded,
+            })
+            created += 1
+
+        self.import_file = False  # clear after import
+        message = f'Imported {created} rows.'
+        if error_lines:
+            message += ' Errors: ' + ', '.join([f'Row {r}: {m}' for r, m in error_lines])
+        return {
+            'type': 'ir.actions.client',
+            'tag': 'display_notification',
+            'params': {'title': _('Import result'), 'message': message, 'type': 'info', 'sticky': False},
+        }
+
+    # ------------------------------------------------------------------
+    # apply to payslips button
+    # ------------------------------------------------------------------
     def action_apply_to_payslips(self):
-        """Create / update payslip inputs for every line in the sheet."""
         self.ensure_one()
         Payroll = self.env['hr.payslip']
-        Input   = self.env['hr.payslip.input']
+        Input = self.env['hr.payslip.input']
         InputType = self.env['hr.payslip.input.type']
 
-        # cache input types once
         codes = ('OT_NORMAL', 'OT_HOLIDAY', 'LATE_DEDUCTION')
         input_types = {
             c: InputType.search([('code', '=', c)], limit=1) or
@@ -42,11 +120,11 @@ class HROTSheet(models.Model):
         }
 
         for line in self.line_ids:
-            year  = int(self.year)
+            year = int(self.year)
             month = int(self.month)
             last_day = calendar.monthrange(year, month)[1]
             date_from = date(year, month, 1)
-            date_to   = date(year, month, last_day)
+            date_to = date(year, month, last_day)
 
             slip = Payroll.search([
                 ('employee_id', '=', line.employee_id.id),
@@ -64,8 +142,7 @@ class HROTSheet(models.Model):
                 struct = (contract.structure_type_id.default_struct_id or
                           self.env['hr.payroll.structure'].search([], limit=1))
                 if not struct:
-                    raise UserError(
-                        _('No salary structure for employee %s') % line.employee_id.name)
+                    raise UserError(_('No salary structure for employee %s') % line.employee_id.name)
                 slip = Payroll.create({
                     'employee_id': contract.employee_id.id,
                     'contract_id': contract.id,
@@ -76,18 +153,21 @@ class HROTSheet(models.Model):
                         contract.employee_id, struct.id, date_from, date_to),
                 })
 
-            # upsert only non-zero values
             def upsert(code, amount):
                 if not amount:
                     return
-                Input.search([
+                existing = Input.search([
                     ('payslip_id', '=', slip.id),
                     ('input_type_id', '=', input_types[code].id)
-                ], limit=1).write({'amount': amount}) or Input.create({
-                    'payslip_id': slip.id,
-                    'input_type_id': input_types[code].id,
-                    'amount': amount,
-                })
+                ], limit=1)
+                if existing:
+                    existing.amount = amount
+                else:
+                    Input.create({
+                        'payslip_id': slip.id,
+                        'input_type_id': input_types[code].id,
+                        'amount': amount,
+                    })
 
             upsert('OT_NORMAL', line.ot_normal)
             upsert('OT_HOLIDAY', line.ot_holiday)
@@ -98,7 +178,8 @@ class HROTSheet(models.Model):
         self.state = 'done'
         return {'type': 'ir.actions.act_window_close'}
 
-class HROTSheetLine(models.Model):
+
+class HrOtSheetLine(models.Model):
     _name = 'hr.ot.sheet.line'
     _description = 'OT Sheet Line'
 
@@ -108,5 +189,4 @@ class HROTSheetLine(models.Model):
     ot_holiday = fields.Monetary(string='Holiday/Sunday OT Amount', currency_field='company_currency')
     late_deduction = fields.Monetary(string='Late Deduction Amount', currency_field='company_currency')
     company_currency = fields.Many2one('res.currency', related='employee_id.company_id.currency_id', readonly=True)
-
     applied = fields.Boolean(default=False)
