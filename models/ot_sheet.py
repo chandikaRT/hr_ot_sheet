@@ -1,7 +1,5 @@
 # -*- coding: utf-8 -*-
-import base64
-import io
-import calendar
+import base64, io, calendar
 from datetime import date
 from odoo import api, fields, models, _
 from odoo.exceptions import UserError
@@ -17,7 +15,7 @@ class HrOtSheet(models.Model):
     _description = 'OT Sheet Header'
 
     # ------------------------------------------------------------------
-    # core header fields
+    # header fields
     # ------------------------------------------------------------------
     name = fields.Char(string='Reference', copy=False, index=True)
     month = fields.Selection([
@@ -30,28 +28,11 @@ class HrOtSheet(models.Model):
     line_ids = fields.One2many('hr.ot.sheet.line', 'sheet_id', string='OT Lines')
     state = fields.Selection([('draft', 'Draft'), ('done', 'Done')], default='draft')
 
-    # ------------------------------------------------------------------
-    # import helper fields (non-stored)
-    # ------------------------------------------------------------------
     import_file = fields.Binary(string='OT Excel file')
     import_filename = fields.Char()
 
-
-class HrOtSheetLine(models.Model):
-    _name = 'hr.ot.sheet.line'
-    _description = 'OT Sheet Line'
-
-    sheet_id = fields.Many2one('hr.ot.sheet', ondelete='cascade')
-    employee_id = fields.Many2one('hr.employee', string='Employee', required=True)
-    ot_normal = fields.Monetary(string='Normal OT Amount', currency_field='company_currency')
-    ot_holiday = fields.Monetary(string='Holiday/Sunday OT Amount', currency_field='company_currency')
-    late_deduction = fields.Monetary(string='Late Deduction Amount', currency_field='company_currency')
-    company_currency = fields.Many2one('res.currency', related='employee_id.company_id.currency_id', readonly=True)
-    applied = fields.Boolean(default=False)
-    description = fields.Char(string='Description')
-
     # ------------------------------------------------------------------
-    # automatic name 001/10/2025
+    # sequence for name 001/10/2025
     # ------------------------------------------------------------------
     @api.model_create_multi
     def create(self, vals_list):
@@ -78,7 +59,7 @@ class HrOtSheetLine(models.Model):
 
         error_lines, created = [], 0
         for idx, row in enumerate(ws.iter_rows(min_row=2, values_only=True), 2):
-            row = list(row) + [None] * 5
+            row = list(row) + [None] * 6
             emp_code, emp_name, ot_normal, ot_holiday, late_ded, description = row[:6]
 
             try:
@@ -108,21 +89,11 @@ class HrOtSheetLine(models.Model):
             })
             created += 1
 
-        self.import_file = False  # clear after import
+        self.import_file = False
         message = f'Imported {created} rows.'
         if error_lines:
             message += ' Errors: ' + ', '.join([f'Row {r}: {m}' for r, m in error_lines])
-        notification = {
-            'type': 'ir.actions.client',
-            'tag': 'display_notification',
-            'params': {
-                'title': _('Import result'),
-                'message': message,
-                'type': 'info',
-                'sticky': False,
-            }
-        }
-        # force-reload the current form
+        # reload form
         return {
             'type': 'ir.actions.act_window',
             'res_model': self._name,
@@ -220,3 +191,4 @@ class HrOtSheetLine(models.Model):
     late_deduction = fields.Monetary(string='Late Deduction Amount', currency_field='company_currency')
     company_currency = fields.Many2one('res.currency', related='employee_id.company_id.currency_id', readonly=True)
     applied = fields.Boolean(default=False)
+    description = fields.Char(string='Description')
