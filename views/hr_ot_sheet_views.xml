@@ -38,6 +38,7 @@
                   <field name="ot_normal"/>
                   <field name="ot_holiday"/>
                   <field name="late_deduction"/>
+                  <field name="description"/>
                   <field name="applied"/>
                 </tree>
               </field>

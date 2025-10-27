@@ -17,7 +17,7 @@ class HrOtSheet(models.Model):
     _description = 'OT Sheet Header'
 
     # ------------------------------------------------------------------
-    # core fields
+    # core header fields
     # ------------------------------------------------------------------
     name = fields.Char(string='Reference', copy=False, index=True)
     month = fields.Selection([
@@ -31,10 +31,24 @@ class HrOtSheet(models.Model):
     state = fields.Selection([('draft', 'Draft'), ('done', 'Done')], default='draft')
 
     # ------------------------------------------------------------------
-    # import helper fields (never stored)
+    # import helper fields (non-stored)
     # ------------------------------------------------------------------
     import_file = fields.Binary(string='OT Excel file')
     import_filename = fields.Char()
+
+
+class HrOtSheetLine(models.Model):
+    _name = 'hr.ot.sheet.line'
+    _description = 'OT Sheet Line'
+
+    sheet_id = fields.Many2one('hr.ot.sheet', ondelete='cascade')
+    employee_id = fields.Many2one('hr.employee', string='Employee', required=True)
+    ot_normal = fields.Monetary(string='Normal OT Amount', currency_field='company_currency')
+    ot_holiday = fields.Monetary(string='Holiday/Sunday OT Amount', currency_field='company_currency')
+    late_deduction = fields.Monetary(string='Late Deduction Amount', currency_field='company_currency')
+    company_currency = fields.Many2one('res.currency', related='employee_id.company_id.currency_id', readonly=True)
+    applied = fields.Boolean(default=False)
+    description = fields.Char(string='Description')
 
     # ------------------------------------------------------------------
     # automatic name 001/10/2025
@@ -65,7 +79,7 @@ class HrOtSheet(models.Model):
         error_lines, created = [], 0
         for idx, row in enumerate(ws.iter_rows(min_row=2, values_only=True), 2):
             row = list(row) + [None] * 5
-            emp_code, emp_name, ot_normal, ot_holiday, late_ded = row[:5]
+            emp_code, emp_name, ot_normal, ot_holiday, late_ded, description = row[:6]
 
             try:
                 ot_normal = float(ot_normal or 0)
@@ -90,6 +104,7 @@ class HrOtSheet(models.Model):
                 'ot_normal': ot_normal,
                 'ot_holiday': ot_holiday,
                 'late_deduction': late_ded,
+                'description': description or '',
             })
             created += 1
 
@@ -167,7 +182,7 @@ class HrOtSheet(models.Model):
                         contract.employee_id, struct.id, date_from, date_to),
                 })
 
-            def upsert(code, amount):
+            def upsert(code, amount, desc=None):
                 if not amount:
                     return
                 existing = Input.search([
@@ -175,17 +190,18 @@ class HrOtSheet(models.Model):
                     ('input_type_id', '=', input_types[code].id)
                 ], limit=1)
                 if existing:
-                    existing.amount = amount
+                    existing.write({'amount': amount, 'description': desc or ''})
                 else:
                     Input.create({
                         'payslip_id': slip.id,
                         'input_type_id': input_types[code].id,
                         'amount': amount,
+                        'description': desc or '',
                     })
 
-            upsert('OT_NORMAL', line.ot_normal)
-            upsert('OT_HOLIDAY', line.ot_holiday)
-            upsert('LATE_DEDUCTION', -abs(line.late_deduction) if line.late_deduction else 0)
+            upsert('OT_NORMAL', line.ot_normal, line.description)
+            upsert('OT_HOLIDAY', line.ot_holiday, line.description)
+            upsert('LATE_DEDUCTION', -abs(line.late_deduction) if line.late_deduction else 0, line.description)
 
             line.applied = True
 
