@@ -4,11 +4,23 @@
     <field name="model">hr.ot.sheet</field>
     <field name="arch" type="xml">
       <form string="OT Sheet">
+        <header>
+          <button name="action_apply_to_payslips"
+                  string="Apply to Payslips"
+                  type="object"
+                  class="btn-primary"
+                  states="draft"/>
+          <field name="state" widget="statusbar"/>
+        </header>
         <sheet>
           <group>
             <field name="name"/>
-            <field name="month"/>
-            <field name="year"/>
+            <label for="month" string="Period"/>
+            <div class="o_row">
+              <field name="month" class="oe_inline"/>
+              <span>/</span>
+              <field name="year" class="oe_inline" nolabel="1"/>
+            </div>
             <field name="state"/>
           </group>
           <notebook>

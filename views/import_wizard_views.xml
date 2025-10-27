@@ -14,7 +14,7 @@
           </group>
           <footer>
             <button string="Import" type="object" name="action_import" class="btn-primary"/>
-            <button string="Apply to Payslips" type="object" name="action_create_inputs"/>
+            <!-- <button string="Apply to Payslips" type="object" name="action_create_inputs"/> -->
             <button string="Cancel" class="btn-secondary" special="cancel"/>
           </footer>
         </sheet>
