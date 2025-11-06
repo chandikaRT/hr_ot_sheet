@@ -1,5 +1,7 @@
 # -*- coding: utf-8 -*-
-import base64, io, calendar
+import base64
+import io
+import calendar
 from datetime import date
 from odoo import api, fields, models, _
 from odoo.exceptions import UserError
@@ -45,7 +47,7 @@ class HrOtSheet(models.Model):
         return super().create(vals_list)
 
     # ------------------------------------------------------------------
-    # import Excel button
+    # import Excel button (reads hours)
     # ------------------------------------------------------------------
     def action_import_excel(self):
         self.ensure_one()
@@ -60,12 +62,12 @@ class HrOtSheet(models.Model):
         error_lines, created = [], 0
         for idx, row in enumerate(ws.iter_rows(min_row=2, values_only=True), 2):
             row = list(row) + [None] * 6
-            emp_code, emp_name, ot_normal, ot_holiday, late_ded, description = row[:6]
+            emp_code, emp_name, ot_normal_hrs, ot_holiday_hrs, late_ded_hrs, description = row[:6]
 
             try:
-                ot_normal = float(ot_normal or 0)
-                ot_holiday = float(ot_holiday or 0)
-                late_ded = float(late_ded or 0)
+                ot_normal_hrs = float(ot_normal_hrs or 0)
+                ot_holiday_hrs = float(ot_holiday_hrs or 0)
+                late_ded_hrs = float(late_ded_hrs or 0)
             except Exception:
                 error_lines.append((idx, 'Invalid numeric value'))
                 continue
@@ -82,10 +84,10 @@ class HrOtSheet(models.Model):
             self.env['hr.ot.sheet.line'].create({
                 'sheet_id': self.id,
                 'employee_id': employee.id,
-                'ot_normal': ot_normal,
-                'ot_holiday': ot_holiday,
-                'late_deduction': late_ded,
-                'description': description or '',
+                'ot_normal_hrs': ot_normal_hrs,
+                'ot_holiday_hrs': ot_holiday_hrs,
+                'late_ded_hrs': late_ded_hrs,
+                'description': description or '',  # allow manual override
             })
             created += 1
 
@@ -186,9 +188,44 @@ class HrOtSheetLine(models.Model):
 
     sheet_id = fields.Many2one('hr.ot.sheet', ondelete='cascade')
     employee_id = fields.Many2one('hr.employee', string='Employee', required=True)
-    ot_normal = fields.Monetary(string='Normal OT Amount', currency_field='company_currency')
-    ot_holiday = fields.Monetary(string='Holiday/Sunday OT Amount', currency_field='company_currency')
-    late_deduction = fields.Monetary(string='Late Deduction Amount', currency_field='company_currency')
+
+    # hours entered by user
+    ot_normal_hrs   = fields.Float(string='Normal OT Hours', digits=(4, 2))
+    ot_holiday_hrs  = fields.Float(string='Holiday OT Hours', digits=(4, 2))
+    late_ded_hrs    = fields.Float(string='Late Deduction Hours', digits=(4, 2))
+
+    # rates from employee master
+    ot_rate         = fields.Float(related='employee_id.x_studio_ot_hours', string='OT Rate', readonly=True)
+    employee_rate   = fields.Float(related='employee_id.x_studio_employee_rate', string='Employee Rate', readonly=True)
+
+    # computed amounts
+    ot_normal       = fields.Monetary(string='Normal OT Amount', currency_field='company_currency',
+                                      compute='_compute_amounts', store=True)
+    ot_holiday      = fields.Monetary(string='Holiday OT Amount', currency_field='company_currency',
+                                      compute='_compute_amounts', store=True)
+    late_deduction  = fields.Monetary(string='Late Deduction Amount', currency_field='company_currency',
+                                      compute='_compute_amounts', store=True)
+
     company_currency = fields.Many2one('res.currency', related='employee_id.company_id.currency_id', readonly=True)
     applied = fields.Boolean(default=False)
-    description = fields.Char(string='Description')
+
+    description = fields.Char(string='Description', compute='_compute_description', store=True)
+
+    @api.depends('ot_normal_hrs', 'ot_holiday_hrs', 'late_ded_hrs', 'ot_rate', 'employee_rate')
+    def _compute_amounts(self):
+        for rec in self:
+            rec.ot_normal      = rec.ot_normal_hrs * rec.ot_rate
+            rec.ot_holiday     = rec.ot_holiday_hrs * rec.ot_rate
+            rec.late_deduction = rec.late_ded_hrs * rec.employee_rate
+
+    @api.depends('ot_normal_hrs', 'ot_holiday_hrs', 'late_ded_hrs', 'ot_rate', 'employee_rate')
+    def _compute_description(self):
+        for rec in self:
+            desc = []
+            if rec.ot_normal_hrs:
+                desc.append(f"{rec.ot_normal_hrs} OT hours @ {rec.ot_rate}")
+            if rec.ot_holiday_hrs:
+                desc.append(f"{rec.ot_holiday_hrs} OT hours @ {rec.ot_rate}")
+            if rec.late_ded_hrs:
+                desc.append(f"{rec.late_ded_hrs} Late hours @ {rec.employee_rate}")
+            rec.description = ' | '.join(desc) if desc else ''

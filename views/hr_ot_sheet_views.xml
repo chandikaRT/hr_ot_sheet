@@ -35,10 +35,15 @@
               <field name="line_ids">
                 <tree editable="bottom">
                   <field name="employee_id"/>
-                  <field name="ot_normal"/>
-                  <field name="ot_holiday"/>
-                  <field name="late_deduction"/>
-                  <field name="description"/>
+                  <field name="ot_normal_hrs"/>
+                  <field name="ot_holiday_hrs"/>
+                  <field name="late_ded_hrs"/>
+                  <field name="ot_rate" optional="show"/>
+                  <field name="employee_rate" optional="show"/>
+                  <field name="ot_normal" readonly="1"/>
+                  <field name="ot_holiday" readonly="1"/>
+                  <field name="late_deduction" readonly="1"/>
+                  <field name="description" readonly="1"/>
                   <field name="applied"/>
                 </tree>
               </field>
