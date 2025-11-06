@@ -172,9 +172,9 @@ class HrOtSheet(models.Model):
                         'name': desc or '',
                     })
 
-            upsert('OT_NORMAL', line.ot_normal, line.description)
-            upsert('OT_HOLIDAY', line.ot_holiday, line.description)
-            upsert('LATE_DEDUCTION', -abs(line.late_deduction) if line.late_deduction else 0, line.description)
+            upsert('OT_NORMAL', line.ot_normal, line._desc_for_code('OT_NORMAL'))
+            upsert('OT_HOLIDAY', line.ot_holiday, line._desc_for_code('OT_HOLIDAY'))
+            upsert('LATE_DEDUCTION', -abs(line.late_deduction) if line.late_deduction else 0, line._desc_for_code('LATE_DEDUCTION'))
 
             line.applied = True
 
@@ -218,14 +218,31 @@ class HrOtSheetLine(models.Model):
             rec.ot_holiday     = rec.ot_holiday_hrs * rec.ot_rate
             rec.late_deduction = rec.late_ded_hrs * rec.employee_rate
 
-    @api.depends('ot_normal_hrs', 'ot_holiday_hrs', 'late_ded_hrs', 'ot_rate', 'employee_rate')
+    @api.depends('ot_normal_hrs', 'ot_holiday_hrs', 'late_ded_hrs',
+                 'ot_rate', 'employee_rate')
     def _compute_description(self):
         for rec in self:
             desc = []
             if rec.ot_normal_hrs:
-                desc.append(f"{rec.ot_normal_hrs} OT hours @ {rec.ot_rate}")
+                desc.append(f"{rec.ot_normal_hrs} OT hours @ "
+                            f"{rec.ot_rate:.2f}")          # 2 dec
             if rec.ot_holiday_hrs:
-                desc.append(f"{rec.ot_holiday_hrs} OT hours @ {rec.ot_rate}")
+                desc.append(f"{rec.ot_holiday_hrs} OT hours @ "
+                            f"{rec.ot_rate:.2f}")
             if rec.late_ded_hrs:
-                desc.append(f"{rec.late_ded_hrs} Late hours @ {rec.employee_rate}")
+                desc.append(f"{rec.late_ded_hrs} Late hours @ "
+                            f"{rec.employee_rate:.2f}")
             rec.description = ' | '.join(desc) if desc else ''
+
+    # ----------------------------------------------------------
+    # helper: return single-type description for payslip input
+    # ----------------------------------------------------------
+    def _desc_for_code(self, code):
+        self.ensure_one()
+        if code == 'OT_NORMAL' and self.ot_normal_hrs:
+            return f"{self.ot_normal_hrs} OT hours @ {self.ot_rate:.2f}"
+        if code == 'OT_HOLIDAY' and self.ot_holiday_hrs:
+            return f"{self.ot_holiday_hrs} OT hours @ {self.ot_rate:.2f}"
+        if code == 'LATE_DEDUCTION' and self.late_ded_hrs:
+            return f"{self.late_ded_hrs} Late hours @ {self.employee_rate:.2f}"
+        return ''
