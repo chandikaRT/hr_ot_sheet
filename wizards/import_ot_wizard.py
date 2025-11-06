@@ -68,7 +68,7 @@ class ImportOTWizard(models.TransientModel):
         created = 0
         for idx, row in enumerate(rows, start=2):
             row = list(row) + [None] * 5
-            emp_code, emp_name, ot_normal, ot_holiday, late_deduction = row[:5]
+            emp_code, emp_name, ot_normal_hrs, ot_holiday_hrs, late_ded_hrs, description = row[:6]
 
             try:
                 ot_normal = float(ot_normal or 0)
@@ -88,11 +88,13 @@ class ImportOTWizard(models.TransientModel):
                 continue
 
             self.env['hr.ot.sheet.line'].create({
-                'sheet_id': sheet.id,
+                'sheet_id': self.id,
                 'employee_id': employee.id,
-                'ot_normal': ot_normal,
-                'ot_holiday': ot_holiday,
-                'late_deduction': late_deduction,
+                'ot_normal_hrs': ot_normal_hrs or 0,
+                'ot_holiday_hrs': ot_holiday_hrs or 0,
+                'late_ded_hrs': late_ded_hrs or 0,
+                # description is auto-generated – keep only if Excel has override
+                'description': description or '',
             })
             created += 1
 
