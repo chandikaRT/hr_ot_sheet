@@ -195,7 +195,7 @@ class HrOtSheetLine(models.Model):
     late_ded_hrs    = fields.Float(string='Late Deduction Hours', digits=(4, 2))
 
     # rates from employee master
-    ot_rate         = fields.Float(related='employee_id.x_studio_ot_hours', string='OT Rate', readonly=True)
+    ot_rate         = fields.Float(related='employee_id.x_studio_ot_rate', string='OT Rate', readonly=True)
     employee_rate   = fields.Float(related='employee_id.x_studio_employee_rate', string='Employee Rate', readonly=True)
 
     # computed amounts
