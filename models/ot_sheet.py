@@ -83,7 +83,7 @@ class HrOtSheet(models.Model):
     @api.model_create_multi
     def create(self, vals_list):
         for vals in vals_list:
-            if vals.get('name', 'New') == 'New':
+            if not vals.get('name'):
                 month = int(vals.get('month'))
                 year = int(vals.get('year'))
                 seq = self.env['ir.sequence'].next_by_code('hr.ot.sheet') or '001'
@@ -180,8 +180,8 @@ class HrOtSheet(models.Model):
                     'type': 'ir.actions.act_window',
                     'res_model': self._name,
                     'res_id': self.id,
-                    'view_mode': 'form',
-                    'target': 'main',
+                    'views': [[False, 'form']],
+                    'target': 'current',
                 },
             },
         }
