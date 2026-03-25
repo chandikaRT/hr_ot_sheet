@@ -1,3 +1,5 @@
 id,name,model_id:id,group_id:id,perm_read,perm_write,perm_create,perm_unlink
-access_hr_ot_sheet_user,hr.ot.sheet.user,model_hr_ot_sheet,base.group_user,1,1,1,1
-access_hr_ot_sheet_line_user,hr.ot.sheet.line.user,model_hr_ot_sheet_line,base.group_user,1,1,1,1
+access_hr_ot_sheet_user,hr.ot.sheet.user,model_hr_ot_sheet,base.group_user,1,0,0,0
+access_hr_ot_sheet_manager,hr.ot.sheet.manager,model_hr_ot_sheet,hr_payroll.group_hr_payroll_manager,1,1,1,1
+access_hr_ot_sheet_line_user,hr.ot.sheet.line.user,model_hr_ot_sheet_line,base.group_user,1,0,0,0
+access_hr_ot_sheet_line_manager,hr.ot.sheet.line.manager,model_hr_ot_sheet_line,hr_payroll.group_hr_payroll_manager,1,1,1,1
